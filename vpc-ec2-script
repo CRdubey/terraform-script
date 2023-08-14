@@ -1,0 +1,95 @@
+##### VPC-Creation #####
+resource "aws_vpc" "myvpc" {
+ cidr_block = "10.0.0.0/16"
+ 
+ tags = {
+   Name = "Project VPC"
+ }
+}
+##### SUBNET-Creation #####
+resource "aws_subnet" "mysubnet" {
+  availability_zone = "ap-southeast-1a"
+  vpc_id = aws_vpc.myvpc.id
+  cidr_block = "10.0.0.0/24"
+  tags = {
+    Name = "mysubnet"
+  }
+}
+##### IGW-Creation #####
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.myvpc.id
+
+  tags = {
+    Name = "main"
+  }
+}
+##### ROUTETABLE-Creation #####
+resource "aws_route_table" "myroutetable" {
+  vpc_id = aws_vpc.myvpc.id
+  route = []
+  tags = {
+    Name = "myroutetable"
+  }
+}
+##### ROUTE-CREATION #####
+resource "aws_route" "myroute" {
+  route_table_id            = aws_route_table.myroutetable.id
+  destination_cidr_block    = "0.0.0.0/0"
+  gateway_id                = aws_internet_gateway.igw.id
+  depends_on                = [aws_route_table.myroutetable]
+}
+##### SUBNET-ASSOCIATION #####
+resource "aws_route_table_association" "sub-association" {
+  subnet_id      = aws_subnet.mysubnet.id
+  route_table_id = aws_route_table.myroutetable.id
+}
+
+######### Security Group ###################
+
+resource "aws_security_group" "sg" {
+  name        = "allow_all_traffic"
+  description = "Allow all inbound traffic"
+  vpc_id      = aws_vpc.myvpc.id
+
+  ingress = [
+    {
+      description      = "All traffic"
+      from_port        = 0    # All ports
+      to_port          = 0    # All Ports
+      protocol         = "-1" # All traffic
+      cidr_blocks      = ["0.0.0.0/0"]
+      ipv6_cidr_blocks = null
+      prefix_list_ids  = null
+      security_groups  = null
+      self             = null
+    }
+  ]
+
+  egress = [
+    {
+      from_port        = 0
+      to_port          = 0
+      protocol         = "-1"
+      cidr_blocks      = ["0.0.0.0/0"]
+      ipv6_cidr_blocks = ["::/0"]
+      description      = "Outbound rule"
+      prefix_list_ids  = null
+      security_groups  = null
+      self             = null
+    }
+  ]
+
+  tags = {
+    Name = "all_traffic"
+  }
+}
+
+resource "aws_instance" "myec2" {
+  ami           = "ami-091a58610910a87a9"
+  instance_type = "t2.micro"
+  associate_public_ip_address = true  # Add this line to enable public IP
+  subnet_id = aws_subnet.mysubnet.id 
+  tags = {
+    Name = "HelloWorld"
+  }
+}
